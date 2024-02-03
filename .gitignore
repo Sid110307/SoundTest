@@ -1,0 +1,8 @@
+.DS_Store
+bin/
+
+.vscode/
+.vs/
+.idea/
+
+imgui.ini
