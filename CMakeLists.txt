@@ -26,5 +26,5 @@ target_sources(soundTest PUBLIC
 
 find_package(SDL2 REQUIRED)
 
-target_link_libraries(soundTest PUBLIC ${CMAKE_DL_LIBS} ${SDL2_LIBRARIES})
+target_link_libraries(soundTest PUBLIC ${CMAKE_DL_LIBS} pthread ${SDL2_LIBRARIES})
 target_include_directories(soundTest PUBLIC lib ${SDL2_INCLUDE_DIRS})

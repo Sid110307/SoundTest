@@ -15,9 +15,11 @@
 #include <imgui/imgui_impl_sdl2.h>
 #include <imgui/imgui_impl_opengl3.h>
 
-int WIDTH = 1366, HEIGHT = 768;
-constexpr auto CLOCK_RATE = 1193182;
+constexpr int CLOCK_RATE = 1193182;
+constexpr int WAV_CHUNK_SIZE = 1024;
+constexpr double WAV_THRESHOLD = 0.1;
 
+int WIDTH = 1366, HEIGHT = 768;
 std::vector<std::pair<int, int>> data = {{440, 500},
                                          {220, 500}};
 bool isPlaying = false, isDragging = false;
@@ -28,8 +30,8 @@ void error(const std::string &message)
 {
     if (ImGui::GetCurrentContext())
     {
-        ImGui::OpenPopup("Error");
         errorMessage = message;
+        ImGui::OpenPopup("Error");
     }
 
     std::cerr << message << std::endl;
@@ -44,15 +46,64 @@ void check(int result)
     }
 }
 
-void beep(int frequency, int length)
+void beep(int fd, int frequency, int length)
 {
-    int fd = open("/dev/console", O_WRONLY);
     check(fd);
 
     check(ioctl(fd, KIOCSOUND, static_cast<int>(CLOCK_RATE / frequency)));
     std::this_thread::sleep_for(std::chrono::milliseconds(length));
     check(ioctl(fd, KIOCSOUND, 0));
-    close(fd);
+}
+
+void importWAV(const char* path)
+{
+    std::ifstream file(path, std::ios::binary);
+    if (!file.is_open()) error("Failed to open file: " + std::string(strerror(errno)));
+    else
+    {
+        file.seekg(0, std::ios::end);
+        auto fileSize = file.tellg();
+        file.seekg(0, std::ios::beg);
+
+        std::vector<char> buffer(fileSize);
+        file.read(buffer.data(), fileSize);
+        file.close();
+
+        std::string header(buffer.begin(), buffer.begin() + 4);
+        if (header != "RIFF") error("Invalid WAV file!");
+        else
+        {
+            auto chunkSize = *reinterpret_cast<int*>(&buffer[4]);
+            auto sampleRate = *reinterpret_cast<int*>(&buffer[24]);
+            auto bitsPerSample = *reinterpret_cast<short*>(&buffer[34]);
+            auto numSamples = chunkSize / (bitsPerSample / 8);
+            auto sampleDuration = 1.0 / sampleRate;
+
+            if (bitsPerSample != 16)
+            {
+                error("Only 16-bit WAV files are supported! This file is " + std::to_string(bitsPerSample) + "-bit.");
+                return;
+            }
+
+            std::vector<int> samples(numSamples);
+            for (auto i = 0; i < numSamples; ++i) samples[i] = *reinterpret_cast<short*>(&buffer[44 + i * 2]);
+
+            for (auto i = 0; i < numSamples; i += WAV_CHUNK_SIZE)
+            {
+                std::vector<int> chunk(samples.begin() + i, samples.begin() + std::min(i + WAV_CHUNK_SIZE, numSamples));
+
+                auto max = *std::max_element(chunk.begin(), chunk.end());
+                auto min = *std::min_element(chunk.begin(), chunk.end());
+                auto amplitude = max - min;
+
+                if (amplitude > WAV_THRESHOLD)
+                    data.emplace_back(sampleRate / amplitude,
+                                      static_cast<int>(sampleDuration * static_cast<int>(chunk.size()) * 1000));
+            }
+
+            std::cout << "Imported " << numSamples << " samples at " << sampleRate << " Hz" << std::endl;
+        }
+    }
 }
 
 SDL_Window* init()
@@ -107,7 +158,9 @@ void drawGUI(SDL_Window* window)
     ImGui::Begin("SoundTest", nullptr, ImGuiWindowFlags_NoTitleBar);
     ImGui::SeparatorText("Sound Data");
 
-    if (ImGui::Button(isPlaying ? "Stop" : "Play")) isPlaying = !isPlaying;
+    if (ImGui::Button("Play")) isPlaying = true;
+    ImGui::SameLine();
+    if (ImGui::Button("Stop")) isPlaying = false;
     ImGui::SameLine();
     if (ImGui::Button("Add Sound")) data.emplace_back(440, 500);
     ImGui::SameLine();
@@ -171,23 +224,8 @@ void drawGUI(SDL_Window* window)
         ImGui::InputText("File Path", path, sizeof(path));
         if (ImGui::Button("OK"))
         {
-            std::ifstream file(path, std::ios::binary);
-            if (!file.is_open())
-            {
-                error("Failed to open file: " + std::string(strerror(errno)));
-                ImGui::CloseCurrentPopup();
-            } else
-            {
-                int frequency, length;
-                file.seekg(22);
-                file.read(reinterpret_cast<char*>(&frequency), sizeof(frequency));
-                file.seekg(40);
-                file.read(reinterpret_cast<char*>(&length), sizeof(length));
-
-                data.emplace_back(frequency, length);
-                file.close();
-                ImGui::CloseCurrentPopup();
-            }
+            importWAV(path);
+            ImGui::CloseCurrentPopup();
         }
 
         ImGui::SameLine();
@@ -230,12 +268,16 @@ int main()
         drawGUI(window);
         if (isPlaying)
         {
+            int fd = open("/dev/console", O_WRONLY);
             for (const auto &[freq, length]: data)
             {
                 currentFreq = freq;
-                beep(freq, length);
+                beep(fd, freq, length);
             }
 
+            close(fd);
+
+            currentFreq = 0;
             isPlaying = false;
         }
 
