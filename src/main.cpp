@@ -107,12 +107,12 @@ void drawGUI(SDL_Window* window)
     if (ImGui::Button("Add Sound")) data.emplace_back(440, 500);
     ImGui::SameLine();
     addImportButton("Import WAV", Audio::importWAV);
-//    ImGui::SameLine();
-//    addImportButton("Import MIDI", Audio::importMIDI);
-//    ImGui::SameLine();
-//    addImportButton("Import MP3", Audio::importMP3);
-//    ImGui::SameLine();
-//    addImportButton("Import OGG", Audio::importOGG);
+    ImGui::SameLine();
+    addImportButton("Import MIDI", Audio::importMIDI);
+    ImGui::SameLine();
+    addImportButton("Import MP3", Audio::importMP3);
+    ImGui::SameLine();
+    addImportButton("Import OGG", Audio::importOGG);
 
     for (auto i = 0; i < static_cast<int>(data.size()); ++i)
     {
