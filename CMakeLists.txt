@@ -16,7 +16,6 @@ add_executable(soundTest ${PROJECT_SOURCE_DIR}/main.cpp)
 
 target_sources(soundTest PUBLIC
         lib/imgui/imgui.cpp
-        lib/imgui/imgui_demo.cpp
         lib/imgui/imgui_draw.cpp
         lib/imgui/imgui_tables.cpp
         lib/imgui/imgui_widgets.cpp
