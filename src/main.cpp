@@ -1,7 +1,7 @@
-#include <iostream>
 #include <vector>
 #include <chrono>
 #include <thread>
+#include <mutex>
 
 #include <unistd.h>
 #include <fcntl.h>
@@ -17,16 +17,37 @@
 #include "include/utils.h"
 #include "include/audio.h"
 
+std::mutex dataMutex;
+std::vector<std::pair<int, int>> data;
 bool isPlaying = false, isDragging = false;
 int currentFreq = 0, draggedIndex = -1;
 
 void beep(int fd, int frequency, int length)
 {
-    check(fd);
+    if (frequency == 0)
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(length));
+        return;
+    }
 
+    check(fd);
     check(ioctl(fd, KIOCSOUND, static_cast<int>(CLOCK_RATE / frequency)));
     std::this_thread::sleep_for(std::chrono::milliseconds(length));
     check(ioctl(fd, KIOCSOUND, 0));
+}
+
+void playSounds()
+{
+    std::lock_guard<std::mutex> lock(dataMutex);
+    int fd = open("/dev/console", O_WRONLY);
+
+    for (const auto &[freq, length]: data)
+    {
+        currentFreq = freq;
+        beep(fd, freq, length);
+    }
+
+    close(fd);
 }
 
 SDL_Window* init()
@@ -72,7 +93,7 @@ SDL_Window* init()
     return window;
 }
 
-void addImportButton(const char* label, void (* callback)(const char*))
+void addImportButton(const char* label, void (* callback)(std::vector<std::pair<int, int>> &, const char*))
 {
     if (ImGui::Button(label)) ImGui::OpenPopup(label);
     if (ImGui::BeginPopup(label))
@@ -81,7 +102,7 @@ void addImportButton(const char* label, void (* callback)(const char*))
         ImGui::InputText("File Path", path, sizeof(path));
         if (ImGui::Button("OK"))
         {
-            callback(path);
+            callback(data, path);
             ImGui::CloseCurrentPopup();
         }
 
@@ -104,15 +125,23 @@ void drawGUI(SDL_Window* window)
     ImGui::SameLine();
     if (ImGui::Button("Stop")) isPlaying = false;
     ImGui::SameLine();
+    if (ImGui::Button("Clear"))
+    {
+        data.clear();
+        isPlaying = false;
+    }
+    ImGui::SameLine();
     if (ImGui::Button("Add Sound")) data.emplace_back(440, 500);
     ImGui::SameLine();
-    addImportButton("Import WAV", Audio::importWAV);
+    ImGui::TextColored(ImVec4(0.43f, 0.43f, 0.50f, 0.50f), "|");
     ImGui::SameLine();
-    addImportButton("Import MIDI", Audio::importMIDI);
+    addImportButton("Import WAV", AudioImporter::importWAV);
     ImGui::SameLine();
-    addImportButton("Import MP3", Audio::importMP3);
+    addImportButton("Import MIDI", AudioImporter::importMIDI);
     ImGui::SameLine();
-    addImportButton("Import OGG", Audio::importOGG);
+    addImportButton("Import MP3", AudioImporter::importMP3);
+    ImGui::SameLine();
+    addImportButton("Import OGG", AudioImporter::importOGG);
 
     for (auto i = 0; i < static_cast<int>(data.size()); ++i)
     {
@@ -166,13 +195,6 @@ void drawGUI(SDL_Window* window)
     ImGui::InputText("Audio Device", audioDevice, sizeof(audioDevice));
     ImGui::Text("Currently Playing: %d Hz", currentFreq);
 
-    if (ImGui::BeginPopup("Error"))
-    {
-        ImGui::Text("%s", errorMessage.c_str());
-        if (ImGui::Button("OK")) ImGui::CloseCurrentPopup();
-        ImGui::EndPopup();
-    }
-
     ImGui::End();
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -201,14 +223,8 @@ int main()
         drawGUI(window);
         if (isPlaying)
         {
-            int fd = open("/dev/console", O_WRONLY);
-            for (const auto &[freq, length]: data)
-            {
-                currentFreq = freq;
-                beep(fd, freq, length);
-            }
-
-            close(fd);
+            std::thread sounds(playSounds);
+            sounds.join();
 
             currentFreq = 0;
             isPlaying = false;
