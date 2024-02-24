@@ -1,5 +1,7 @@
 #include "include/audio.h"
 
+bool AudioImporter::skipHeader = false;
+
 void AudioImporter::importWAV(std::vector<std::pair<int, int>> &data, const char* path)
 {
     std::ifstream file(path, std::ios::binary);
@@ -267,4 +269,33 @@ void AudioImporter::importMP3(std::vector<std::pair<int, int>> &data, const char
 
     delete[] buffer;
     std::cout << "Imported " << data.size() << " notes from " << samples << " samples" << std::endl;
+}
+
+void AudioImporter::importCSV(std::vector<std::pair<int, int>> &data, const char* path)
+{
+    std::ifstream file(path);
+    if (!file.is_open())
+    {
+        error("Failed to open file: " + std::string(strerror(errno)));
+        return;
+    }
+
+    std::string line;
+    if (skipHeader) std::getline(file, line);
+
+    while (std::getline(file, line))
+    {
+        std::stringstream ss(line);
+        std::string freq, duration;
+
+        std::getline(ss, freq, ',');
+        std::getline(ss, duration, ',');
+
+        if (freq.empty() || duration.empty()) continue;
+
+        try { data.emplace_back(std::stoi(freq), std::stoi(duration)); }
+        catch (std::invalid_argument &e) { error("Invalid data in CSV file: " + std::string(freq) + ", " + duration); }
+    }
+
+    std::cout << "Imported " << data.size() << " notes from " << data.size() << " samples" << std::endl;
 }

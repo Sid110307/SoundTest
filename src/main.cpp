@@ -89,13 +89,15 @@ SDL_Window* init()
     return window;
 }
 
-void addImportButton(const char* label, void (* callback)(std::vector<std::pair<int, int>> &, const char*))
+void addImportButton(const std::string &label, void (* callback)(std::vector<std::pair<int, int>> &, const char*))
 {
-    if (ImGui::Button(label)) ImGui::OpenPopup(label);
-    if (ImGui::BeginPopup(label))
+    if (ImGui::Button(label.c_str())) ImGui::OpenPopup(label.c_str());
+    if (ImGui::BeginPopup(label.c_str()))
     {
         static char path[256];
         ImGui::InputText("File Path", path, sizeof(path));
+
+        if (label == "Import CSV") ImGui::Checkbox("Skip Header", &AudioImporter::skipHeader);
         if (ImGui::Button("OK"))
         {
             callback(data, path);
@@ -165,9 +167,12 @@ void drawGUI(SDL_Window* window)
     addImportButton("Import MIDI", AudioImporter::importMIDI);
     ImGui::SameLine();
     addImportButton("Import MP3", AudioImporter::importMP3);
+    ImGui::SameLine();
+    addImportButton("Import CSV", AudioImporter::importCSV);
 
     ImGui::SeparatorText("Tone Generator");
     drawToneGenerator();
+    if (!data.empty()) ImGui::Separator();
 
     for (auto i = 0; i < static_cast<int>(data.size()); ++i)
     {
