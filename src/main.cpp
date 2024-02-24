@@ -22,17 +22,17 @@ std::vector<std::pair<int, int>> data;
 bool isPlaying = false, isDragging = false;
 int currentFreq = 0, draggedIndex = -1;
 
-void beep(int fd, int frequency, int length)
+void beep(int fd, int frequency, int duration)
 {
     if (frequency == 0)
     {
-        std::this_thread::sleep_for(std::chrono::milliseconds(length));
+        std::this_thread::sleep_for(std::chrono::milliseconds(duration));
         return;
     }
 
     check(fd);
     check(ioctl(fd, KIOCSOUND, static_cast<int>(CLOCK_RATE / frequency)));
-    std::this_thread::sleep_for(std::chrono::milliseconds(length));
+    std::this_thread::sleep_for(std::chrono::milliseconds(duration));
     check(ioctl(fd, KIOCSOUND, 0));
 }
 
@@ -41,10 +41,10 @@ void playSounds()
     std::lock_guard<std::mutex> lock(dataMutex);
     int fd = open("/dev/console", O_WRONLY);
 
-    for (const auto &[freq, length]: data)
+    for (const auto &[freq, duration]: data)
     {
         currentFreq = freq;
-        beep(fd, freq, length);
+        beep(fd, freq, duration);
     }
 
     close(fd);
@@ -108,6 +108,35 @@ void addImportButton(const char* label, void (* callback)(std::vector<std::pair<
     }
 }
 
+void drawToneGenerator()
+{
+    int numOctaves = 8, keysPerOctave = 12, startingOctave = 4;
+    double baseFrequency = 440.0, semitoneRatio = std::pow(2.0, 1.0 / 12.0);
+    std::string pianoKeyLabels[] = {"A", "A#", "B", "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#"};
+
+    static int duration = 500;
+    ImGui::SliderInt("Duration", &duration, 0, 1000);
+
+    for (int octave = 0; octave < numOctaves; ++octave)
+        for (int i = 0; i < keysPerOctave; ++i)
+        {
+            int keyIndex = octave * keysPerOctave + i;
+            double frequency = baseFrequency * std::pow(semitoneRatio, keyIndex);
+
+            ImGui::PushID(keyIndex);
+            std::string keyLabel = std::string(pianoKeyLabels[i]) + std::to_string(octave + startingOctave);
+
+            if (ImGui::Button(keyLabel.c_str(), ImVec2(35, 35)))
+            {
+                std::lock_guard<std::mutex> lock(dataMutex);
+                data.emplace_back(static_cast<int>(std::round(frequency)), duration);
+            }
+
+            ImGui::PopID();
+            if ((i + 1) % 12 != 0) ImGui::SameLine();
+        }
+}
+
 void drawGUI(SDL_Window* window)
 {
     ImGui_ImplOpenGL3_NewFrame();
@@ -137,16 +166,19 @@ void drawGUI(SDL_Window* window)
     ImGui::SameLine();
     addImportButton("Import MP3", AudioImporter::importMP3);
 
+    ImGui::SeparatorText("Tone Generator");
+    drawToneGenerator();
+
     for (auto i = 0; i < static_cast<int>(data.size()); ++i)
     {
-        auto &[freq, length] = data[i];
+        auto &[freq, duration] = data[i];
 
         ImGui::PushID(i);
         ImGui::PushItemWidth(static_cast<float>(WIDTH) / 3);
 
         ImGui::SliderInt("Frequency", &freq, 0, 1000);
         ImGui::SameLine();
-        ImGui::SliderInt("Length", &length, 0, 1000);
+        ImGui::SliderInt("Duration", &duration, 0, 1000);
 
         ImGui::SameLine();
         ImGui::Text(" ");
