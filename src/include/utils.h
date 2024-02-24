@@ -8,8 +8,8 @@
 constexpr int WIDTH = 1366;
 constexpr int HEIGHT = 768;
 constexpr int CLOCK_RATE = 1193182;
-constexpr int WAV_CHUNK_SIZE = 1000;
-constexpr double WAV_THRESHOLD = 0.1;
+constexpr int CHUNK_SIZE = 1000;
+constexpr double THRESHOLD = 0.1;
 
 static std::string errorMessage;
 
@@ -31,11 +31,14 @@ static void error(const std::string &message)
     std::cerr << message << std::endl;
 }
 
-static void check(int result)
+template<typename T>
+static T check(T result)
 {
     if (result < 0)
     {
         error("Error: " + std::string(strerror(errno)));
         exit(EXIT_FAILURE);
     }
+
+    return result;
 }

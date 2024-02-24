@@ -52,11 +52,7 @@ void playSounds()
 
 SDL_Window* init()
 {
-    if (SDL_Init(SDL_INIT_VIDEO) != 0)
-    {
-        error("Failed to initialize SDL! Error: " + std::string(SDL_GetError()));
-        exit(EXIT_FAILURE);
-    }
+    check(SDL_Init(SDL_INIT_VIDEO));
 
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
@@ -140,8 +136,6 @@ void drawGUI(SDL_Window* window)
     addImportButton("Import MIDI", AudioImporter::importMIDI);
     ImGui::SameLine();
     addImportButton("Import MP3", AudioImporter::importMP3);
-    ImGui::SameLine();
-    addImportButton("Import OGG", AudioImporter::importOGG);
 
     for (auto i = 0; i < static_cast<int>(data.size()); ++i)
     {

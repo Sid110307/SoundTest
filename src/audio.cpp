@@ -42,16 +42,16 @@ void AudioImporter::importWAV(std::vector<std::pair<int, int>> &data, const char
         samples[i] = bitsPerSample == 8 ? static_cast<int>(static_cast<unsigned char>(buffer[44 + i])) - 128
                                         : *reinterpret_cast<short*>(&buffer[44 + i * 2]);
 
-    for (auto i = 0; i < numSamples; i += WAV_CHUNK_SIZE)
+    for (auto i = 0; i < numSamples; i += CHUNK_SIZE)
     {
         std::vector<int> chunk(samples.begin() + i,
-                               samples.begin() + std::min(i + WAV_CHUNK_SIZE, numSamples));
+                               samples.begin() + std::min(i + CHUNK_SIZE, numSamples));
 
         auto max = *std::max_element(chunk.begin(), chunk.end());
         auto min = *std::min_element(chunk.begin(), chunk.end());
         auto amplitude = max - min;
 
-        if (amplitude > WAV_THRESHOLD)
+        if (amplitude > THRESHOLD)
             data.emplace_back(sampleRate / amplitude,
                               static_cast<int>(sampleDuration * static_cast<int>(chunk.size()) * 1000));
     }
@@ -204,10 +204,67 @@ void AudioImporter::importMIDI(std::vector<std::pair<int, int>> &data, const cha
 
 void AudioImporter::importMP3(std::vector<std::pair<int, int>> &data, const char* path)
 {
-    error("MP3 import not yet implemented!");
-}
+    mpg123_init();
+    int err = 0;
 
-void AudioImporter::importOGG(std::vector<std::pair<int, int>> &data, const char* path)
-{
-    error("OGG import not yet implemented!");
+    auto mh = mpg123_new(nullptr, &err);
+    if (mh == nullptr)
+    {
+        error("Failed to create mpg123 handle: " + std::string(mpg123_plain_strerror(err)));
+        return;
+    }
+    if (err != MPG123_OK)
+    {
+        error("Failed to initialize mpg123: " + std::string(mpg123_plain_strerror(err)));
+        return;
+    }
+
+    check(mpg123_open(mh, path));
+    long rate = 0;
+    int channels = 0, encoding = 0;
+
+    check(mpg123_getformat(mh, &rate, &channels, &encoding));
+    if (encoding != MPG123_ENC_SIGNED_16)
+    {
+        error("Unsupported MP3 file format! Only 16-bit MP3 files are supported. Found " +
+              std::to_string(mpg123_encsize(encoding)) + "-bit MP3 file.");
+        return;
+    }
+
+    auto bufferSize = mpg123_outblock(mh);
+    auto buffer = new unsigned char[bufferSize];
+    size_t done = 0;
+    size_t samples = 0;
+
+    do
+    {
+        err = mpg123_read(mh, buffer, bufferSize, &done);
+        for (size_t i = 0; i < done; i += 2) samples += buffer[i] << 8 | buffer[i + 1];
+    } while (err == MPG123_OK);
+
+    if (err != MPG123_DONE)
+    {
+        error("Failed to read MP3 file: " + std::string(mpg123_strerror(mh)));
+        return;
+    }
+
+    mpg123_close(mh);
+    mpg123_delete(mh);
+    mpg123_exit();
+
+    auto sampleDuration = 1.0 / static_cast<double>(rate);
+    for (size_t i = 0; i < samples; i += CHUNK_SIZE)
+    {
+        std::vector<int> chunk(buffer + i, buffer + std::min(i + CHUNK_SIZE, samples));
+        auto max = *std::max_element(chunk.begin(), chunk.end());
+        auto min = *std::min_element(chunk.begin(), chunk.end());
+        auto amplitude = max - min;
+
+        if (amplitude > THRESHOLD)
+            data.emplace_back(rate / amplitude,
+                              static_cast<int>(sampleDuration * static_cast<int>(chunk.size()) * 1000));
+    }
+
+    delete[] buffer;
+    std::cout << "Imported " << data.size() << " notes from " << samples << " samples" << std::endl;
 }
