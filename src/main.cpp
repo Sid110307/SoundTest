@@ -17,7 +17,6 @@
 #include "include/utils.h"
 #include "include/audio.h"
 
-std::mutex dataMutex;
 std::vector<std::pair<int, int>> data;
 bool isPlaying = false, isDragging = false;
 int currentFreq = 0, draggedIndex = -1;
@@ -34,20 +33,6 @@ void beep(int fd, int frequency, int duration)
     check(ioctl(fd, KIOCSOUND, static_cast<int>(CLOCK_RATE / frequency)));
     std::this_thread::sleep_for(std::chrono::milliseconds(duration));
     check(ioctl(fd, KIOCSOUND, 0));
-}
-
-void playSounds()
-{
-    std::lock_guard<std::mutex> lock(dataMutex);
-    int fd = open("/dev/console", O_WRONLY);
-
-    for (const auto &[freq, duration]: data)
-    {
-        currentFreq = freq;
-        beep(fd, freq, duration);
-    }
-
-    close(fd);
 }
 
 SDL_Window* init()
@@ -129,10 +114,7 @@ void drawToneGenerator()
             std::string keyLabel = std::string(pianoKeyLabels[i]) + std::to_string(octave + startingOctave);
 
             if (ImGui::Button(keyLabel.c_str(), ImVec2(35, 35)))
-            {
-                std::lock_guard<std::mutex> lock(dataMutex);
                 data.emplace_back(static_cast<int>(std::round(frequency)), duration);
-            }
 
             ImGui::PopID();
             if ((i + 1) % 12 != 0) ImGui::SameLine();
@@ -254,9 +236,15 @@ int main()
         drawGUI(window);
         if (isPlaying)
         {
-            std::thread sounds(playSounds);
-            sounds.join();
+            int fd = open("/dev/console", O_WRONLY);
 
+            for (const auto &[freq, duration]: data)
+            {
+                currentFreq = freq;
+                beep(fd, freq, duration);
+            }
+
+            close(fd);
             currentFreq = 0;
             isPlaying = false;
         }
