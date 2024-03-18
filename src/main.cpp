@@ -71,6 +71,17 @@ SDL_Window* init()
     ImGui_ImplOpenGL3_Init("#version 330 core");
     ImGui::StyleColorsDark();
 
+    SDL_AddEventWatch([](void*, SDL_Event* event) -> int
+                      {
+                          if (event->type == SDL_WINDOWEVENT && event->window.event == SDL_WINDOWEVENT_RESIZED)
+                          {
+                              WIDTH = event->window.data1;
+                              HEIGHT = event->window.data2;
+                          }
+
+                          return EXIT_SUCCESS;
+                      }, window);
+
     return window;
 }
 
@@ -127,9 +138,12 @@ void drawGUI(SDL_Window* window)
     ImGui_ImplSDL2_NewFrame(window);
     ImGui::NewFrame();
 
-    ImGui::Begin("SoundTest", nullptr, ImGuiWindowFlags_NoTitleBar);
-    ImGui::SeparatorText("Sound Data");
+    ImGui::Begin("SoundTest", nullptr,
+                 ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove);
+    ImGui::SetWindowPos(ImVec2(0, 0));
+    ImGui::SetWindowSize(ImVec2(static_cast<float>(WIDTH), static_cast<float>(HEIGHT)));
 
+    ImGui::SeparatorText("Controls");
     if (ImGui::Button("Play")) isPlaying = true;
     ImGui::SameLine();
     if (ImGui::Button("Stop")) isPlaying = false;
@@ -140,7 +154,90 @@ void drawGUI(SDL_Window* window)
         isPlaying = false;
     }
     ImGui::SameLine();
-    if (ImGui::Button("Add Sound")) data.emplace_back(440, 500);
+    ImGui::TextColored(ImVec4(0.43f, 0.43f, 0.50f, 0.50f), "|");
+    ImGui::SameLine();
+    if (ImGui::BeginCombo("Presets", "None"))
+    {
+        if (ImGui::Selectable("Für Elise - Beethoven"))
+        {
+            data.clear();
+            AudioImporter::importCSV(data, "lib/res/fur_elise.csv");
+        }
+
+        if (ImGui::Selectable("Tetris Theme (Korobeiniki)"))
+        {
+            data.clear();
+            AudioImporter::importCSV(data, "lib/res/tetris.csv");
+        }
+
+        if (ImGui::Selectable("Axel F - Harold Faltermeyer"))
+        {
+            data.clear();
+            AudioImporter::importCSV(data, "lib/res/axel_f.csv");
+        }
+
+        if (ImGui::Selectable("Super Mario Bros. Theme - Koji Kondo"))
+        {
+            data.clear();
+            AudioImporter::importCSV(data, "lib/res/mario.csv");
+        }
+
+        if (ImGui::Selectable("Pink Panther Theme - Henry Mancini"))
+        {
+            data.clear();
+            AudioImporter::importCSV(data, "lib/res/pink_panther.csv");
+        }
+
+        if (ImGui::Selectable("Memories - Maroon 5"))
+        {
+            data.clear();
+            AudioImporter::importCSV(data, "lib/res/memories.csv");
+        }
+
+        if (ImGui::Selectable("Shape of You - Ed Sheeran"))
+        {
+            data.clear();
+            AudioImporter::importCSV(data, "lib/res/shape_of_you.csv");
+        }
+
+        if (ImGui::Selectable("Nokia Tune - Francisco Tárrega"))
+        {
+            data.clear();
+            AudioImporter::importCSV(data, "lib/res/nokia.csv");
+        }
+
+        if (ImGui::Selectable("Happy Birthday - Patty Hill"))
+        {
+            data.clear();
+            AudioImporter::importCSV(data, "lib/res/happy_birthday.csv");
+        }
+
+        if (ImGui::Selectable("Harry Potter Theme - John Williams"))
+        {
+            data.clear();
+            AudioImporter::importCSV(data, "lib/res/harry_potter.csv");
+        }
+
+        if (ImGui::Selectable("Star Wars Theme - John Williams"))
+        {
+            data.clear();
+            AudioImporter::importCSV(data, "lib/res/star_wars.csv");
+        }
+
+        if (ImGui::Selectable("Pirates of the Caribbean Theme - Klaus Badelt"))
+        {
+            data.clear();
+            AudioImporter::importCSV(data, "lib/res/pirates_of_the_caribbean.csv");
+        }
+
+        if (ImGui::Selectable("At Doom's Gate - Bobby Prince"))
+        {
+            data.clear();
+            AudioImporter::importCSV(data, "lib/res/doom.csv");
+        }
+
+        ImGui::EndCombo();
+    }
     ImGui::SameLine();
     ImGui::TextColored(ImVec4(0.43f, 0.43f, 0.50f, 0.50f), "|");
     ImGui::SameLine();
@@ -154,7 +251,7 @@ void drawGUI(SDL_Window* window)
 
     ImGui::SeparatorText("Tone Generator");
     drawToneGenerator();
-    if (!data.empty()) ImGui::Separator();
+    if (!data.empty()) ImGui::SeparatorText("Sound Data");
 
     for (auto i = 0; i < static_cast<int>(data.size()); ++i)
     {
@@ -202,7 +299,7 @@ void drawGUI(SDL_Window* window)
         ImGui::PopID();
     }
 
-    ImGui::SeparatorText("Audio Device");
+    ImGui::SeparatorText("Settings");
 
     static char audioDevice[256] = "/dev/console";
     ImGui::InputText("Audio Device", audioDevice, sizeof(audioDevice));

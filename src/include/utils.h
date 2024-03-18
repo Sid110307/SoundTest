@@ -5,12 +5,11 @@
 
 #include <imgui/imgui.h>
 
-constexpr int WIDTH = 1366;
-constexpr int HEIGHT = 768;
 constexpr int CLOCK_RATE = 1193182;
 constexpr int CHUNK_SIZE = 1000;
 constexpr double THRESHOLD = 0.1;
 
+[[maybe_unused]] static int WIDTH = 1366, HEIGHT = 768;
 static std::string errorMessage;
 
 static void error(const std::string &message)
