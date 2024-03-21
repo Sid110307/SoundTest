@@ -18,6 +18,7 @@
 #include "include/audio.h"
 
 std::vector<std::pair<int, int>> data;
+static char audioDevice[256] = "/dev/console";
 bool isPlaying = false, isDragging = false;
 int currentFreq = 0, draggedIndex = -1;
 
@@ -93,7 +94,7 @@ void addImportButton(const std::string &label, void (* callback)(std::vector<std
         static char path[256];
         ImGui::InputText("File Path", path, sizeof(path));
 
-        if (label == "Import CSV") ImGui::Checkbox("Skip Header", &AudioImporter::skipHeader);
+        if (label == "Import CSV") ImGui::Checkbox("Skip Header", &AudioManager::skipHeader);
         if (ImGui::Button("OK"))
         {
             callback(data, path);
@@ -161,93 +162,96 @@ void drawGUI(SDL_Window* window)
         if (ImGui::Selectable("Für Elise - Beethoven"))
         {
             data.clear();
-            AudioImporter::importCSV(data, "lib/res/fur_elise.csv");
+            AudioManager::importCSV(data, "lib/res/fur_elise.csv");
         }
 
         if (ImGui::Selectable("Tetris Theme (Korobeiniki)"))
         {
             data.clear();
-            AudioImporter::importCSV(data, "lib/res/tetris.csv");
+            AudioManager::importCSV(data, "lib/res/tetris.csv");
         }
 
         if (ImGui::Selectable("Axel F - Harold Faltermeyer"))
         {
             data.clear();
-            AudioImporter::importCSV(data, "lib/res/axel_f.csv");
+            AudioManager::importCSV(data, "lib/res/axel_f.csv");
         }
 
         if (ImGui::Selectable("Super Mario Bros. Theme - Koji Kondo"))
         {
             data.clear();
-            AudioImporter::importCSV(data, "lib/res/mario.csv");
+            AudioManager::importCSV(data, "lib/res/mario.csv");
         }
 
         if (ImGui::Selectable("Pink Panther Theme - Henry Mancini"))
         {
             data.clear();
-            AudioImporter::importCSV(data, "lib/res/pink_panther.csv");
+            AudioManager::importCSV(data, "lib/res/pink_panther.csv");
         }
 
         if (ImGui::Selectable("Memories - Maroon 5"))
         {
             data.clear();
-            AudioImporter::importCSV(data, "lib/res/memories.csv");
+            AudioManager::importCSV(data, "lib/res/memories.csv");
         }
 
         if (ImGui::Selectable("Shape of You - Ed Sheeran"))
         {
             data.clear();
-            AudioImporter::importCSV(data, "lib/res/shape_of_you.csv");
+            AudioManager::importCSV(data, "lib/res/shape_of_you.csv");
         }
 
         if (ImGui::Selectable("Nokia Tune - Francisco Tárrega"))
         {
             data.clear();
-            AudioImporter::importCSV(data, "lib/res/nokia.csv");
+            AudioManager::importCSV(data, "lib/res/nokia.csv");
         }
 
         if (ImGui::Selectable("Happy Birthday - Patty Hill"))
         {
             data.clear();
-            AudioImporter::importCSV(data, "lib/res/happy_birthday.csv");
+            AudioManager::importCSV(data, "lib/res/happy_birthday.csv");
         }
 
         if (ImGui::Selectable("Harry Potter Theme - John Williams"))
         {
             data.clear();
-            AudioImporter::importCSV(data, "lib/res/harry_potter.csv");
+            AudioManager::importCSV(data, "lib/res/harry_potter.csv");
         }
 
         if (ImGui::Selectable("Star Wars Theme - John Williams"))
         {
             data.clear();
-            AudioImporter::importCSV(data, "lib/res/star_wars.csv");
+            AudioManager::importCSV(data, "lib/res/star_wars.csv");
         }
 
         if (ImGui::Selectable("Pirates of the Caribbean Theme - Klaus Badelt"))
         {
             data.clear();
-            AudioImporter::importCSV(data, "lib/res/pirates_of_the_caribbean.csv");
+            AudioManager::importCSV(data, "lib/res/pirates_of_the_caribbean.csv");
         }
 
         if (ImGui::Selectable("At Doom's Gate - Bobby Prince"))
         {
             data.clear();
-            AudioImporter::importCSV(data, "lib/res/doom.csv");
+            AudioManager::importCSV(data, "lib/res/doom.csv");
         }
 
         ImGui::EndCombo();
     }
+
+    ImGui::SeparatorText("Import/Export");
+    addImportButton("Import WAV", AudioManager::importWAV);
     ImGui::SameLine();
-    ImGui::TextColored(ImVec4(0.43f, 0.43f, 0.50f, 0.50f), "|");
+    addImportButton("Import MIDI", AudioManager::importMIDI);
     ImGui::SameLine();
-    addImportButton("Import WAV", AudioImporter::importWAV);
+    addImportButton("Import MP3", AudioManager::importMP3);
     ImGui::SameLine();
-    addImportButton("Import MIDI", AudioImporter::importMIDI);
+    addImportButton("Import CSV", AudioManager::importCSV);
     ImGui::SameLine();
-    addImportButton("Import MP3", AudioImporter::importMP3);
+    if (ImGui::Button("Import from SoundCloud")) ImGui::OpenPopup("Import from SoundCloud");
     ImGui::SameLine();
-    addImportButton("Import CSV", AudioImporter::importCSV);
+    if (ImGui::Button("Export CSV")) AudioManager::exportCSV(data, "sound_data.csv");
 
     ImGui::SeparatorText("Tone Generator");
     drawToneGenerator();
@@ -301,9 +305,24 @@ void drawGUI(SDL_Window* window)
 
     ImGui::SeparatorText("Settings");
 
-    static char audioDevice[256] = "/dev/console";
     ImGui::InputText("Audio Device", audioDevice, sizeof(audioDevice));
     ImGui::Text("Currently Playing: %d Hz", currentFreq);
+
+    if (ImGui::BeginPopup("Import from SoundCloud"))
+    {
+        static char id[256];
+        ImGui::InputText("SoundCloud ID", id, sizeof(id));
+
+        if (ImGui::Button("OK"))
+        {
+            AudioManager::importSoundCloud(data, id);
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
+        ImGui::EndPopup();
+    }
 
     ImGui::End();
     ImGui::Render();
@@ -333,8 +352,7 @@ int main()
         drawGUI(window);
         if (isPlaying)
         {
-            int fd = open("/dev/console", O_WRONLY);
-
+            int fd = open(audioDevice, O_WRONLY);
             for (const auto &[freq, duration]: data)
             {
                 currentFreq = freq;

@@ -23,5 +23,7 @@ target_sources(soundTest PUBLIC
 )
 
 find_package(SDL2 REQUIRED)
-target_link_libraries(soundTest PUBLIC ${CMAKE_DL_LIBS} pthread ${SDL2_LIBRARIES} mpg123)
-target_include_directories(soundTest PUBLIC lib ${SDL2_INCLUDE_DIRS})
+find_package(CURL REQUIRED)
+target_link_libraries(soundTest PUBLIC ${CMAKE_DL_LIBS} pthread ${SDL2_LIBRARIES} mpg123 ${CURL_LIBRARIES})
+target_include_directories(soundTest PUBLIC lib ${SDL2_INCLUDE_DIRS} ${CURL_INCLUDE_DIRS})
+target_compile_definitions(soundTest PUBLIC SOUNDCLOUD_API_KEY="${$ENV{SOUNDCLOUD_API_KEY}}")

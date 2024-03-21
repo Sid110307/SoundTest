@@ -5,5 +5,5 @@ if [ -z "$(which cmake)" ]; then
     exit 1
 fi
 
+[ -f .env ] && source .env
 cmake -S . -B bin && cmake --build bin --target all -j4 && sudo ./bin/soundTest
-

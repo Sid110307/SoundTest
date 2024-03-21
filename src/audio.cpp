@@ -1,8 +1,8 @@
 #include "include/audio.h"
 
-bool AudioImporter::skipHeader = false;
+bool AudioManager::skipHeader = false;
 
-void AudioImporter::importWAV(std::vector<std::pair<int, int>> &data, const char* path)
+void AudioManager::importWAV(std::vector<std::pair<int, int>> &data, const char* path)
 {
     std::ifstream file(path, std::ios::binary);
     if (!file.is_open())
@@ -61,7 +61,7 @@ void AudioImporter::importWAV(std::vector<std::pair<int, int>> &data, const char
     std::cout << "Imported " << data.size() << " notes from " << numSamples << " samples" << std::endl;
 }
 
-void AudioImporter::importMIDI(std::vector<std::pair<int, int>> &data, const char* path)
+void AudioManager::importMIDI(std::vector<std::pair<int, int>> &data, const char* path)
 {
     auto processMIDITrack = [](const std::vector<unsigned char> &trackData, std::vector<std::pair<int, int>> &data)
     {
@@ -204,7 +204,7 @@ void AudioImporter::importMIDI(std::vector<std::pair<int, int>> &data, const cha
     std::cout << "Imported " << data.size() << " notes from " << numTracks << " tracks" << std::endl;
 }
 
-void AudioImporter::importMP3(std::vector<std::pair<int, int>> &data, const char* path)
+void AudioManager::importMP3(std::vector<std::pair<int, int>> &data, const char* path)
 {
     mpg123_init();
     int err = 0;
@@ -225,7 +225,7 @@ void AudioImporter::importMP3(std::vector<std::pair<int, int>> &data, const char
     long rate = 0;
     int channels = 0, encoding = 0;
 
-    check(mpg123_getformat(mh, &rate, &channels, &encoding));
+    mpg123_getformat(mh, &rate, &channels, &encoding);
     if (encoding != MPG123_ENC_SIGNED_16)
     {
         error("Unsupported MP3 file format! Only 16-bit MP3 files are supported. Found " +
@@ -271,7 +271,7 @@ void AudioImporter::importMP3(std::vector<std::pair<int, int>> &data, const char
     std::cout << "Imported " << data.size() << " notes from " << samples << " samples" << std::endl;
 }
 
-void AudioImporter::importCSV(std::vector<std::pair<int, int>> &data, const char* path)
+void AudioManager::importCSV(std::vector<std::pair<int, int>> &data, const char* path)
 {
     std::ifstream file(path);
     if (!file.is_open())
@@ -298,4 +298,64 @@ void AudioImporter::importCSV(std::vector<std::pair<int, int>> &data, const char
     }
 
     std::cout << "Imported " << data.size() << " notes from " << data.size() << " samples" << std::endl;
+}
+
+void AudioManager::importSoundCloud(std::vector<std::pair<int, int>> &data, const char* id)
+{
+    std::string filename = "soundcloud_" + std::string(id) + ".mp3";
+    CURL* curl = curl_easy_init();
+    if (curl == nullptr)
+    {
+        error("Failed to initialize cURL");
+        return;
+    }
+
+    std::string url = "http://api.soundcloud.com/tracks/" + std::string(id) + "/download";
+    std::string buffer;
+
+    struct curl_slist* headers = nullptr;
+    curl_slist_append(headers, ("Authorization: OAuth " + std::string(SOUNDCLOUD_API_KEY)).c_str());
+
+    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, [](void* ptr, size_t size, size_t nmemb, void* stream) -> size_t
+    {
+        auto data = reinterpret_cast<std::string*>(stream);
+        data->append(reinterpret_cast<char*>(ptr), size * nmemb);
+        return size * nmemb;
+    });
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &buffer);
+    check(curl_easy_perform(curl));
+    curl_easy_cleanup(curl);
+
+    std::ofstream file(filename, std::ios::binary);
+    if (!file.is_open())
+    {
+        error("Failed to open file: " + std::string(strerror(errno)));
+        return;
+    }
+
+    file.write(buffer.c_str(), static_cast<long>(buffer.size()));
+    file.close();
+
+    importMP3(data, filename.c_str());
+    if (file.good()) remove(filename.c_str());
+
+    std::cout << "Imported " << data.size() << " notes from SoundCloud track " << id << std::endl;
+}
+
+void AudioManager::exportCSV(std::vector<std::pair<int, int>> &data, const char* path)
+{
+    std::ofstream file(path);
+    if (!file.is_open())
+    {
+        error("Failed to open file: " + std::string(strerror(errno)));
+        return;
+    }
+
+    file << "Frequency (Hz),Duration (ms)" << std::endl;
+    for (auto &note: data) file << note.first << ',' << note.second << std::endl;
+    file.close();
+
+    std::cout << "Exported " << data.size() << " notes to " << path << std::endl;
 }

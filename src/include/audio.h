@@ -8,15 +8,19 @@
 #include <cmath>
 
 #include <mpg123.h>
+#include <curl/curl.h>
+
 #include "utils.h"
 
-class AudioImporter
+class AudioManager
 {
 public:
     static void importWAV(std::vector<std::pair<int, int>> &data, const char* path);
     static void importMIDI(std::vector<std::pair<int, int>> &data, const char* path);
     static void importMP3(std::vector<std::pair<int, int>> &data, const char* path);
     static void importCSV(std::vector<std::pair<int, int>> &data, const char* path);
+    static void importSoundCloud(std::vector<std::pair<int, int>> &data, const char* id);
+    static void exportCSV(std::vector<std::pair<int, int>> &data, const char* path);
 
     static bool skipHeader;
 };
