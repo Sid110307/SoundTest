@@ -1,7 +1,6 @@
 #include <vector>
 #include <chrono>
 #include <thread>
-#include <mutex>
 
 #include <unistd.h>
 #include <fcntl.h>
@@ -350,11 +349,16 @@ int main()
         }
 
         drawGUI(window);
+        SDL_GL_SwapWindow(window);
+        SDL_RenderPresent(SDL_GetRenderer(window));
+
         if (isPlaying)
         {
             int fd = open(audioDevice, O_WRONLY);
             for (const auto &[freq, duration]: data)
             {
+                if (!isPlaying) break;
+
                 currentFreq = freq;
                 beep(fd, freq, duration);
             }
@@ -363,9 +367,6 @@ int main()
             currentFreq = 0;
             isPlaying = false;
         }
-
-        SDL_GL_SwapWindow(window);
-        SDL_RenderPresent(SDL_GetRenderer(window));
     }
 
     ImGui_ImplOpenGL3_Shutdown();
