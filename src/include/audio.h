@@ -6,6 +6,7 @@
 #include <sstream>
 #include <chrono>
 #include <cmath>
+#include <algorithm>
 
 #include <mpg123.h>
 #include <curl/curl.h>
